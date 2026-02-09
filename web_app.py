@@ -35,8 +35,6 @@ def save_favorites(favorites):
         json.dump(favorites, f, ensure_ascii=False, indent=2)
 
 # 初始化 session state
-if 'stock_code_input' not in st.session_state:
-    st.session_state.stock_code_input = "600519"
 if 'run_analysis' not in st.session_state:
     st.session_state.run_analysis = False
 
@@ -71,15 +69,64 @@ with st.sidebar.expander("⭐ 我的收藏", expanded=True):
             
             label = f"{name} ({code})"
             if st.button(label, key=f"fav_{code}", use_container_width=True):
-                st.session_state.stock_code_input = code
+                # 更新选择框的选中值
+                st.session_state.stock_selector_index = 0 # 需要重置索引，稍后处理
+                # 这里我们通过设置 session_state.stock_code_manual 来触发
+                st.session_state.stock_code_manual = code
                 st.session_state.run_analysis = True
                 st.rerun()
 
 st.sidebar.markdown("---")
 
-# 股票代码输入
-# 使用 key 绑定 session_state，这样可以通过代码更新输入框的值
-stock_code = st.sidebar.text_input("股票代码", key="stock_code_input", help="请输入6位股票代码，如 600519")
+# --- 股票搜索与选择 ---
+# 加载全量股票数据
+@st.cache_data
+def load_stock_list():
+    try:
+        with open('stock_info_full.json', 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except:
+        return []
+
+stock_list = load_stock_list()
+
+# 构建选项列表
+# 格式: "600519 | 贵州茅台 (GZMT)"
+options = []
+code_map = {} # 用于从 display_str 反查 code
+for s in stock_list:
+    display_str = f"{s['code']} | {s['name']} ({s.get('pinyin', '')})"
+    options.append(display_str)
+    code_map[display_str] = s['code']
+
+# 处理默认值或手动输入的值
+default_index = 0
+current_code = st.session_state.get('stock_code_manual', "600519")
+
+# 尝试在选项中找到当前代码对应的索引
+for i, opt in enumerate(options):
+    if opt.startswith(current_code):
+        default_index = i
+        break
+
+# 选择框
+selected_option = st.sidebar.selectbox(
+    "股票搜索 (支持代码/名称/拼音)",
+    options=options,
+    index=default_index,
+    key="stock_selector",
+    help="您可以输入代码(600519)、名称(贵州茅台)或拼音首字母(gzmt)进行搜索"
+)
+
+# 解析选中的代码
+if selected_option:
+    stock_code = code_map[selected_option]
+else:
+    stock_code = current_code # Fallback
+
+# 清除手动设置的 code，避免一直锁定
+if 'stock_code_manual' in st.session_state:
+    del st.session_state.stock_code_manual
 
 # 检查是否已收藏
 is_fav = False

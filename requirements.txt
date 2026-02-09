@@ -6,3 +6,4 @@ streamlit>=1.23.0
 plotly
 yfinance
 altair<5
+pypinyin
