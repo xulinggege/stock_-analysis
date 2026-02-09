@@ -2,6 +2,7 @@ akshare
 pandas
 matplotlib
 mplfinance
-streamlit
+streamlit>=1.23.0
 plotly
 yfinance
+altair<5
