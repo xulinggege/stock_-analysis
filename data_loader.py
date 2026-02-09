@@ -4,6 +4,7 @@ import yfinance as yf
 from datetime import datetime
 import json
 import os
+import requests
 
 # 静态股票名称映射文件
 STOCK_NAMES_FILE = 'stock_names.json'
@@ -110,7 +111,31 @@ def get_stock_name(stock_code: str) -> str:
     except Exception:
         pass # 静默失败，尝试下一方法
 
-    # 3. 尝试 yfinance
+    # 3. 尝试新浪财经接口 (Sina Finance)
+    # 这是一个非常稳定且轻量级的 HTTP 接口，适合作为 AkShare 的备选
+    try:
+        if stock_code.startswith('6'):
+            full_code = f"sh{stock_code}"
+        else:
+            full_code = f"sz{stock_code}"
+            
+        url = f"http://hq.sinajs.cn/list={full_code}"
+        headers = {'Referer': 'http://finance.sina.com.cn'}
+        
+        resp = requests.get(url, headers=headers, timeout=3)
+        if resp.status_code == 200:
+            text = resp.text
+            # 格式: var hq_str_sh600519="贵州茅台,..."
+            if '="' in text:
+                content = text.split('="')[1]
+                if content:
+                    name = content.split(',')[0]
+                    if name:
+                        return name
+    except Exception:
+        pass
+
+    # 4. 尝试 yfinance
     try:
         suffix = ".SS" if stock_code.startswith("6") else ".SZ"
         ticker = yf.Ticker(stock_code + suffix)
