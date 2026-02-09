@@ -27,8 +27,9 @@ def fetch_and_save_stocks():
     # 尝试多次，防止网络波动
     for i in range(3):
         try:
-            # 接口: stock_zh_a_spot_em (东方财富)
-            df = ak.stock_zh_a_spot_em()
+            # 接口: stock_info_a_code_name (沪深京A股代码和名称)
+            # 相比 stock_zh_a_spot_em (实时行情)，这个接口数据量小，更稳定
+            df = ak.stock_info_a_code_name()
             if not df.empty:
                 print(f"成功获取 {len(df)} 条数据。")
                 break
@@ -58,10 +59,10 @@ def fetch_and_save_stocks():
         # 处理全量数据
         print("正在生成拼音索引...")
         stock_list = []
-        # df 列: 序号, 代码, 名称, 最新价, ...
+        # df 列: code, name
         for index, row in df.iterrows():
-            code = str(row['代码'])
-            name = str(row['名称'])
+            code = str(row['code'])
+            name = str(row['name'])
             # 过滤非A股代码（简单过滤）
             if not (code.startswith('60') or code.startswith('00') or code.startswith('30') or code.startswith('68')):
                 continue
