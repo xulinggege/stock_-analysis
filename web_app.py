@@ -4,6 +4,9 @@ from plotly.subplots import make_subplots
 import pandas as pd
 from datetime import datetime, timedelta
 import data_loader
+import importlib
+# 强制重新加载 data_loader，防止 Streamlit Cloud 缓存旧版本导致 AttributeError
+importlib.reload(data_loader)
 import json
 import os
 
