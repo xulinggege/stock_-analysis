@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+venv/
+env/
+.env
+.venv/
+venv.bak/
+
+# Trae/VS Code
+.trae/
+.vscode/
+
+# System
+.DS_Store
+Thumbs.db
+
+# Project specific
+*.png
+*.jpg
+*.jpeg
+# 排除本地生成的图表图片，避免污染仓库
+*_analysis.png
