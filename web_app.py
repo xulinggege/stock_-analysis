@@ -82,7 +82,7 @@ st.sidebar.markdown("---")
 
 # --- 股票搜索与选择 ---
 # 加载全量股票数据
-@st.cache_data
+# @st.cache_data # 移除缓存，确保每次都能读取到最新的文件内容（文件本身不大，读取开销可忽略）
 def load_stock_list():
     try:
         with open('stock_info_full.json', 'r', encoding='utf-8') as f:
@@ -145,13 +145,26 @@ if not options:
         display_str = f"{current_code} | (未知名称)"
         options = [display_str]
         code_map[display_str] = current_code
+else:
+    # 如果有搜索结果，检查当前选中的股票是否在结果中
+    # 如果不在，我们需要在顶部添加一个“请选择”的占位符，防止 Selectbox 自动选中第一个搜索结果并触发刷新
+    current_in_options = False
+    for opt in options:
+        if code_map.get(opt) == current_code:
+            current_in_options = True
+            break
+            
+    if not current_in_options:
+        placeholder = "--- 请选择搜索结果 ---"
+        options.insert(0, placeholder)
+        code_map[placeholder] = None # 标记为占位符
 
 # 确定 Selectbox 的默认选中项
 default_index = 0
 try:
     # 尝试找到包含当前代码的选项
     for i, opt in enumerate(options):
-        if code_map[opt] == current_code:
+        if code_map.get(opt) == current_code:
             default_index = i
             break
 except:
@@ -167,8 +180,9 @@ selected_option = st.sidebar.selectbox(
 
 # 处理选择变更
 if selected_option:
-    selected_code = code_map[selected_option]
-    if selected_code != current_code:
+    selected_code = code_map.get(selected_option)
+    # 只有当选中的是有效代码（非占位符）且与当前不同时，才触发更新
+    if selected_code and selected_code != current_code:
         st.session_state.target_stock_code = selected_code
         st.session_state.run_analysis = True
         st.rerun()
