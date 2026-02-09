@@ -2,6 +2,11 @@ import akshare as ak
 import pandas as pd
 import yfinance as yf
 from datetime import datetime
+import json
+import os
+
+# 静态股票名称映射文件
+STOCK_NAMES_FILE = 'stock_names.json'
 
 def get_stock_data(stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
     """
@@ -79,9 +84,22 @@ def get_stock_data(stock_code: str, start_date: str, end_date: str) -> pd.DataFr
 
 def get_stock_name(stock_code: str) -> str:
     """
-    获取股票名称，优先使用 AkShare，失败则尝试 yfinance
+    获取股票名称，优先级:
+    1. 本地静态映射 (stock_names.json)
+    2. AkShare
+    3. yfinance
     """
-    # 尝试 AkShare
+    # 1. 尝试从本地静态文件读取
+    try:
+        if os.path.exists(STOCK_NAMES_FILE):
+            with open(STOCK_NAMES_FILE, 'r', encoding='utf-8') as f:
+                stock_dict = json.load(f)
+                if stock_code in stock_dict:
+                    return stock_dict[stock_code]
+    except Exception:
+        pass
+
+    # 2. 尝试 AkShare
     try:
         # stock_individual_info_em 获取个股信息
         df = ak.stock_individual_info_em(symbol=stock_code)
@@ -92,7 +110,7 @@ def get_stock_name(stock_code: str) -> str:
     except Exception:
         pass # 静默失败，尝试下一方法
 
-    # 尝试 yfinance
+    # 3. 尝试 yfinance
     try:
         suffix = ".SS" if stock_code.startswith("6") else ".SZ"
         ticker = yf.Ticker(stock_code + suffix)
