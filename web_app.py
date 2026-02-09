@@ -4,6 +4,30 @@ from plotly.subplots import make_subplots
 import pandas as pd
 from datetime import datetime, timedelta
 import data_loader
+import json
+import os
+
+# --- 辅助函数：收藏管理 ---
+FAV_FILE = 'favorites.json'
+
+def load_favorites():
+    if not os.path.exists(FAV_FILE):
+        return []
+    try:
+        with open(FAV_FILE, 'r') as f:
+            return json.load(f)
+    except:
+        return []
+
+def save_favorites(favorites):
+    with open(FAV_FILE, 'w') as f:
+        json.dump(favorites, f)
+
+# 初始化 session state
+if 'stock_code_input' not in st.session_state:
+    st.session_state.stock_code_input = "600519"
+if 'run_analysis' not in st.session_state:
+    st.session_state.run_analysis = False
 
 # 设置页面配置
 st.set_page_config(
@@ -12,11 +36,47 @@ st.set_page_config(
     layout="wide"
 )
 
-# 侧边栏配置
+# 加载收藏
+favorites = load_favorites()
+
+# --- 侧边栏配置 ---
 st.sidebar.header("参数设置")
 
+# 收藏夹功能区
+with st.sidebar.expander("⭐ 我的收藏", expanded=True):
+    if not favorites:
+        st.write("暂无收藏")
+    else:
+        st.write("点击查看:")
+        # 使用列布局来放置按钮，使其更紧凑
+        cols = st.columns(3)
+        for i, code in enumerate(favorites):
+            if st.button(code, key=f"fav_{code}", use_container_width=True):
+                st.session_state.stock_code_input = code
+                st.session_state.run_analysis = True
+                st.rerun()
+
+st.sidebar.markdown("---")
+
 # 股票代码输入
-stock_code = st.sidebar.text_input("股票代码", value="600519", help="请输入6位股票代码，如 600519")
+# 使用 key 绑定 session_state，这样可以通过代码更新输入框的值
+stock_code = st.sidebar.text_input("股票代码", key="stock_code_input", help="请输入6位股票代码，如 600519")
+
+# 添加/取消收藏按钮
+col_fav1, col_fav2 = st.sidebar.columns(2)
+if stock_code in favorites:
+    if col_fav2.button("💔 取消收藏", use_container_width=True):
+        favorites.remove(stock_code)
+        save_favorites(favorites)
+        st.rerun()
+else:
+    if col_fav1.button("❤️ 添加收藏", use_container_width=True):
+        if stock_code and len(stock_code) == 6:
+            favorites.append(stock_code)
+            save_favorites(favorites)
+            st.rerun()
+        else:
+            st.sidebar.warning("请输入有效的6位代码")
 
 # 日期范围选择
 today = datetime.now()
@@ -28,9 +88,16 @@ with col1:
 with col2:
     end_date = st.date_input("结束日期", value=today)
 
-# 分析按钮
-if st.sidebar.button("开始分析", type="primary"):
-    with st.spinner("正在获取数据并生成图表..."):
+# 分析按钮逻辑
+# 如果点击了“开始分析”或者通过点击收藏触发了自动分析
+start_btn = st.sidebar.button("开始分析", type="primary")
+
+if start_btn or st.session_state.run_analysis:
+    # 重置自动运行标志，防止刷新页面后重复运行（虽然 st.button 本身不保持状态，但为了逻辑清晰）
+    if st.session_state.run_analysis:
+        st.session_state.run_analysis = False
+        
+    with st.spinner(f"正在获取 {stock_code} 的数据并生成图表..."):
         # 格式化日期为 YYYYMMDD
         s_date_str = start_date.strftime('%Y%m%d')
         e_date_str = end_date.strftime('%Y%m%d')
@@ -40,10 +107,13 @@ if st.sidebar.button("开始分析", type="primary"):
             df = data_loader.get_stock_data(stock_code, s_date_str, e_date_str)
             
             if df.empty:
-                st.error("未获取到数据，请检查股票代码或日期范围。")
+                st.error(f"未获取到股票 {stock_code} 的数据，请检查代码或日期范围。")
             else:
+                # 获取股票名称
+                stock_name = data_loader.get_stock_name(stock_code)
+
                 # 页面主标题
-                st.title(f"📈 {stock_code} 股价与换手率分析")
+                st.title(f"📈 {stock_name} ({stock_code}) 股价与换手率分析")
                 
                 # 创建子图：K线图 (row=1) 和 换手率图 (row=2)
                 fig = make_subplots(
@@ -90,7 +160,7 @@ if st.sidebar.button("开始分析", type="primary"):
                 fig.update_layout(
                     height=800,
                     xaxis_rangeslider_visible=False,
-                    title_text=f"股票代码: {stock_code} ({start_date} - {end_date})",
+                    title_text=f"{stock_name} ({stock_code}) - {start_date} 至 {end_date}",
                     hovermode='x unified' # 统一显示 hover 信息
                 )
                 
@@ -109,4 +179,4 @@ if st.sidebar.button("开始分析", type="primary"):
             st.error(f"发生错误: {str(e)}")
 
 else:
-    st.info("请在左侧设置参数并点击“开始分析”按钮。")
+    st.info("请在左侧选择收藏股票或输入代码并点击“开始分析”。")

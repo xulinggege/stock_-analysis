@@ -77,6 +77,35 @@ def get_stock_data(stock_code: str, start_date: str, end_date: str) -> pd.DataFr
         print(f"yfinance 获取失败: {e}")
         return pd.DataFrame()
 
+def get_stock_name(stock_code: str) -> str:
+    """
+    获取股票名称，优先使用 AkShare，失败则尝试 yfinance
+    """
+    # 尝试 AkShare
+    try:
+        # stock_individual_info_em 获取个股信息
+        df = ak.stock_individual_info_em(symbol=stock_code)
+        # df 结构为 item (项目) 和 value (值)
+        name_row = df[df['item'] == '股票简称']
+        if not name_row.empty:
+            return name_row.iloc[0]['value']
+    except Exception:
+        pass # 静默失败，尝试下一方法
+
+    # 尝试 yfinance
+    try:
+        suffix = ".SS" if stock_code.startswith("6") else ".SZ"
+        ticker = yf.Ticker(stock_code + suffix)
+        info = ticker.info
+        name = info.get('shortName') or info.get('longName')
+        if name:
+            return name
+    except:
+        pass
+        
+    # 如果都失败，返回代码本身
+    return stock_code
+
 if __name__ == "__main__":
     # 测试代码
     test_code = "600519"
