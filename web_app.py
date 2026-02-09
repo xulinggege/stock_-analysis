@@ -37,8 +37,8 @@ def save_favorites(favorites):
 # 初始化 session state
 if 'target_stock_code' not in st.session_state:
     st.session_state.target_stock_code = "600519"
-if 'search_term' not in st.session_state:
-    st.session_state.search_term = ""
+# if 'search_term' not in st.session_state: # 移除旧的状态
+#     st.session_state.search_term = ""
 if 'run_analysis' not in st.session_state:
     st.session_state.run_analysis = False
 
@@ -74,7 +74,7 @@ with st.sidebar.expander("⭐ 我的收藏", expanded=True):
             label = f"{name} ({code})"
             if st.button(label, key=f"fav_{code}", use_container_width=True):
                 st.session_state.target_stock_code = code
-                st.session_state.search_term = "" # 清空搜索框，显示当前选中
+                # st.session_state.search_term = "" # 移除旧的状态清除
                 st.session_state.run_analysis = True
                 st.rerun()
 
@@ -93,71 +93,20 @@ def load_stock_list():
 stock_list = load_stock_list()
 
 # 搜索框
-search_input = st.sidebar.text_input(
-    "股票搜索", 
-    key="search_term",
-    placeholder="输入代码、名称或拼音",
-    help="例如: 600519, 茅台, mt"
-)
+# 移除旧的 text_input
+# search_input = st.sidebar.text_input(...)
 
 # 动态构建选项
 options = []
 code_map = {}
 
+# 加载全量数据到选项列表
+for s in stock_list:
+    display_str = f"{s['code']} | {s['name']} ({s.get('pinyin', '')})"
+    options.append(display_str)
+    code_map[display_str] = s['code']
+
 current_code = st.session_state.target_stock_code
-
-# 1. 如果有搜索词，进行搜索
-if search_input:
-    search_lower = search_input.lower().strip()
-    match_count = 0
-    for s in stock_list:
-        code = s['code']
-        name = s['name']
-        pinyin = s.get('pinyin', '')
-        
-        if (search_lower in code) or (search_lower in name) or (search_lower in pinyin):
-            display_str = f"{code} | {name} ({pinyin})"
-            options.append(display_str)
-            code_map[display_str] = code
-            match_count += 1
-            
-            # 性能优化：只显示前 100 条
-            if match_count >= 100:
-                break
-    
-    if not options:
-        st.sidebar.info("未找到匹配股票")
-    elif len(options) == 100:
-        st.sidebar.caption("结果过多，仅显示前100条")
-
-# 2. 如果没有搜索词，或者搜索结果为空，确保当前选中的股票在列表里（如果存在于全量库）
-# 这样用户能看到当前选的是谁
-if not options:
-    # 尝试在全量库中找到当前代码的信息
-    current_stock_info = next((s for s in stock_list if s['code'] == current_code), None)
-    
-    if current_stock_info:
-        display_str = f"{current_stock_info['code']} | {current_stock_info['name']} ({current_stock_info.get('pinyin', '')})"
-        options = [display_str]
-        code_map[display_str] = current_code
-    else:
-        # 如果当前代码不在库里（比如手动输的或者库没加载），构建一个临时的
-        display_str = f"{current_code} | (未知名称)"
-        options = [display_str]
-        code_map[display_str] = current_code
-else:
-    # 如果有搜索结果，检查当前选中的股票是否在结果中
-    # 如果不在，我们需要在顶部添加一个“请选择”的占位符，防止 Selectbox 自动选中第一个搜索结果并触发刷新
-    current_in_options = False
-    for opt in options:
-        if code_map.get(opt) == current_code:
-            current_in_options = True
-            break
-            
-    if not current_in_options:
-        placeholder = "--- 请选择搜索结果 ---"
-        options.insert(0, placeholder)
-        code_map[placeholder] = None # 标记为占位符
 
 # 确定 Selectbox 的默认选中项
 default_index = 0
@@ -170,18 +119,18 @@ try:
 except:
     pass
 
-# 选择框
+# 选择框 (现在包含全量数据，自带搜索)
 selected_option = st.sidebar.selectbox(
-    "选择股票",
+    "选择股票 (支持拼音/代码搜索)",
     options=options,
     index=default_index,
-    key="stock_selector"
+    key="stock_selector",
+    help="您可以直接输入代码(600)、名称(茅台)或拼音(mt)来筛选"
 )
 
 # 处理选择变更
 if selected_option:
     selected_code = code_map.get(selected_option)
-    # 只有当选中的是有效代码（非占位符）且与当前不同时，才触发更新
     if selected_code and selected_code != current_code:
         st.session_state.target_stock_code = selected_code
         st.session_state.run_analysis = True
