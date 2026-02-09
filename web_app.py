@@ -15,13 +15,21 @@ def load_favorites():
         return []
     try:
         with open(FAV_FILE, 'r') as f:
-            return json.load(f)
+            data = json.load(f)
+            # Migration: convert list of strings to list of dicts
+            if data and isinstance(data[0], str):
+                new_data = []
+                for code in data:
+                    name = data_loader.get_stock_name(code)
+                    new_data.append({'code': code, 'name': name})
+                return new_data
+            return data
     except:
         return []
 
 def save_favorites(favorites):
     with open(FAV_FILE, 'w') as f:
-        json.dump(favorites, f)
+        json.dump(favorites, f, ensure_ascii=False, indent=2)
 
 # 初始化 session state
 if 'stock_code_input' not in st.session_state:
@@ -49,9 +57,18 @@ with st.sidebar.expander("⭐ 我的收藏", expanded=True):
     else:
         st.write("点击查看:")
         # 使用列布局来放置按钮，使其更紧凑
-        cols = st.columns(3)
-        for i, code in enumerate(favorites):
-            if st.button(code, key=f"fav_{code}", use_container_width=True):
+        cols = st.columns(2) # 改为2列以容纳更长的按钮文字
+        for i, item in enumerate(favorites):
+            # 兼容旧数据（如果 load_favorites 迁移失败或手动修改过）
+            if isinstance(item, str):
+                code = item
+                name = item
+            else:
+                code = item.get('code')
+                name = item.get('name', code)
+            
+            label = f"{name}\n({code})"
+            if cols[i % 2].button(label, key=f"fav_{code}", use_container_width=True):
                 st.session_state.stock_code_input = code
                 st.session_state.run_analysis = True
                 st.rerun()
@@ -64,15 +81,29 @@ stock_code = st.sidebar.text_input("股票代码", key="stock_code_input", help=
 
 # 添加/取消收藏按钮
 col_fav1, col_fav2 = st.sidebar.columns(2)
-if stock_code in favorites:
+
+# 检查是否已收藏
+is_fav = False
+for item in favorites:
+    if isinstance(item, dict) and item.get('code') == stock_code:
+        is_fav = True
+        break
+    elif isinstance(item, str) and item == stock_code: # 兼容旧数据
+        is_fav = True
+        break
+
+if is_fav:
     if col_fav2.button("💔 取消收藏", use_container_width=True):
-        favorites.remove(stock_code)
+        # 移除逻辑
+        favorites = [f for f in favorites if (isinstance(f, dict) and f['code'] != stock_code) or (isinstance(f, str) and f != stock_code)]
         save_favorites(favorites)
         st.rerun()
 else:
     if col_fav1.button("❤️ 添加收藏", use_container_width=True):
         if stock_code and len(stock_code) == 6:
-            favorites.append(stock_code)
+            # 获取名称并保存
+            name = data_loader.get_stock_name(stock_code)
+            favorites.append({'code': stock_code, 'name': name})
             save_favorites(favorites)
             st.rerun()
         else:
